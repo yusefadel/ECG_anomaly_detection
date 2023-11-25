@@ -1,26 +1,28 @@
 import torch
 import copy
-import numpy as np
 import pandas as pd
 import seaborn as sns
-from matplotlib.pylab import rcParams
 import matplotlib.pyplot as plt
 from matplotlib import rc
 from sklearn.model_selection import train_test_split
-
 from torch import nn, optim
-
 import torch.nn.functional as F
 
-from IPython.display import display
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import shutil
 import posixpath
-
 import wfdb
 from sklearn import preprocessing as ps
+###############
+from numpy import sin, cos, pi, linspace
+from numpy.random import randn
+from scipy import signal
+from scipy.signal import lfilter, lfilter_zi, filtfilt, butter
+from matplotlib.pyplot import plot, legend, show, grid, figure, savefig, xlim
+import numpy as np
+###############
 
 class Encoder(nn.Module):
   def __init__(self, seq_len, n_features, embedding_dim=64):
@@ -87,16 +89,39 @@ def create_dataset(df):
   return dataset, seq_len, n_features
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = torch.load('C:/Users/FreeComp/Desktop/stem_projects/ecg_processing(abdo_saad)/ecg_processing/anomaly/mode.pth')
+device = torch.device('cpu')
+model = torch.load('C:/Users/FreeComp/Desktop/stem_projects/ecg_processing(abdo_saad)/ecg_processing/anomaly/model1.pth',map_location=torch.device('cpu'))
 model = model.to(device)
 
+##########
+def plot_filter_graphs(data, order):
+    lowcut = 1
+    highcut = 35
+    nyq = 0.5 * 300
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = signal.butter(order, [low, high], btype='band')
+
+    # Apply the filter to data. Use lfilter_zi to choose the initial condition of the filter.
+    z = lfilter(b, a, data)
+
+    # Use filtfilt to apply the filter.
+    y = filtfilt(b, a, data)
+    y = np.flipud(y)
+    y = signal.lfilter(b, a, y)
+    y = np.flipud(y)
+
+    # Make the plot.
+    
+
+    # Return the filtered signal
+    return y
+##########
 
 
 
 
-
-THRESHOLD = 40
+THRESHOLD = 75
 def predict(model, dataset):
   predictions, losses = [], []
   criterion = nn.L1Loss(reduction='sum').to(device)
@@ -114,25 +139,31 @@ def predict(model, dataset):
 
 
 def testPredict(num_of_pulses):
-  start=0
-  end=140
+  THRESHOLD = 75
+  path='C:/Users/FreeComp/Desktop/stem_projects/ecg_processing(abdo_saad)/ecg_processing/anomaly/signalDataTest/12726'
+  record = wfdb.rdrecord(path,sampfrom=0, sampto=250)
+  testsignal= ps.scale(np.nan_to_num(record.p_signal[:,0])).tolist()
   i=0
-  avg=0
+  start=250
+  end=500
+  df=pd.DataFrame([testsignal])
   while i<num_of_pulses:
-    print("iteration num : ",i)
-    print()
-    record = wfdb.rdrecord('C:/Users/FreeComp/Desktop/stem_projects/ecg_processing(abdo_saad)/ecg_processing/anomaly/signalDataTest/test01_00s', sampfrom=start, sampto=end)
-    signal1= ps.scale(np.nan_to_num(record.p_signal[:,0])).tolist()
-    element= pd.DataFrame([signal1])
-    element1,_,_=create_dataset(element)
-    _, pred_losses = predict(model, element1)
-    print("loss :",pred_losses[0])
-    avg=avg+pred_losses[0]
-    start=end
-    end=end+140
-    i=i+1
-  avg=avg/num_of_pulses   
-  return avg
+      record = wfdb.rdrecord(path,sampfrom=start, sampto=end)
+      new_record= ps.scale(np.nan_to_num(record.p_signal[:,0])).tolist()
+      y=plot_filter_graphs(new_record,2)
+      new_record=y.tolist()
+      df=pd.concat([df,pd.DataFrame([new_record])], ignore_index=True)
+      start=end
+      end=end+250
+      i=i+1
+
+  testSet,_,_=create_dataset(df)
+  _, losses = predict(model, testSet)
+  return losses
+
 
 x=testPredict(25)
-print("avg is :",x) 
+# Define the list
+# Calculate the average
+average = sum(x) / len(x)
+print("losses is :",average) 
