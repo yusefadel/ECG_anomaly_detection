@@ -90,7 +90,7 @@ def create_dataset(df):
 
 
 device = torch.device('cpu')
-model = torch.load('C:/Users/FreeComp/Desktop/stem_projects/ecg_processing(abdo_saad)/ecg_processing/anomaly/model1.pth',map_location=torch.device('cpu'))
+model = torch.load('model1.pth',map_location=torch.device('cpu'))
 model = model.to(device)
 
 ##########
